@@ -155,7 +155,7 @@ task "create", group => "hoster", "name", sub {
     my $ips;
     my $count = 0;
     while (!defined($ips) || !defined($$ips[0])) {
-		__use_vnc($params->{name}) if ($count == 1); #kick the server with vnc if we don't get instant success'
+		__use_vnc($params->{name}) if ($count > 0); #kick the server with vnc if we don't get instant success'
         print "   try\n";
         $ips = __vm_getip($params->{name});
         sleep(1);
