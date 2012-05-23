@@ -27,7 +27,7 @@ task "create", sub {
     $params->{vmpassword} = 'rex';
     $params->{vmauth} = 'pass_auth';
 	
-#the above $params settings, but this hack...
+#the above $params settings do not find their way to the needs(task), but this hack does....
 push(@ARGV, '--vmuser=root');
 push(@ARGV, '--vmpassword=rex');
 push(@ARGV, '--vm_auth=pass_auth');
@@ -41,7 +41,7 @@ push(@ARGV, '--vm_auth=pass_auth');
 		password($params->{vmpassword});
 		pass_auth();
         
-        #delay loading the Rex::Assembly::Remote so that it uses the vm's user&pwd specified above.
+        #delay loading the Rex::Assembly::Remote so that it uses the vm's user&pwd specified above, and thus i don't need to modify_task.
         eval 'use Rex::Assembly::Remote;';
 
         
@@ -65,11 +65,12 @@ push(@ARGV, '--vm_auth=pass_auth');
 after 'Assembly:create' => sub {
     my ($server, $server_ref, $params) = @_;
     
-    print "after Assembly:create\n";
+    print "after Assembly:create - running on $server\n";
 };
 
 around create => sub {
-	print "### test2 ###\n";
+    my ($server, $server_ref, $params) = @_;
+	print "### test2 - running on $server ###\n";
 };
 
 before 'Ncreate' => sub {
