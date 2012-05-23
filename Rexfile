@@ -32,9 +32,12 @@ push(@ARGV, '--vmuser=root');
 push(@ARGV, '--vmpassword=rex');
 push(@ARGV, '--vm_auth=pass_auth');
 
+    #TODO: I think I'd rather this was done as a before(), but to do that, I need the cmdline params to be sent to it
     needs Rex::Assembly "exists";
     
     VMTASK: {
+    	#TODO: this presumes that <local> can talk directly to the vm - which might also not be true.
+    	
         ###########
         # this is the actual bit - if i could use 'before' in a cross host IPC way, then this would be simpler to write
 		user($params->{vmuser});

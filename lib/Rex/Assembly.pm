@@ -110,7 +110,16 @@ task "create", group => "hoster", "name", sub {
     
     #TODO: refuse to name a vm with chars you can't use in a hostname
     #refuse to create if the host already exists - test not only libvirsh, but dns etc too (add a --force..)
-    if (1==2) {
+#    my $host = do_task("Assembly:status");  #BUG? this do_task returns nothing :()
+    my $host;
+    my $list = vm list => "all";
+    foreach my $test (@$list) {
+    	if ($test->{name} eq $params->{name}) {
+    		$host = $test;
+    	}
+    }
+    #print 'info'.Dumper $host;
+    if (!defined($host)) {
         print "Creating vm named: $params->{name} \n";
         vm create => $params->{name},
 		network => [
@@ -131,8 +140,18 @@ task "create", group => "hoster", "name", sub {
         print "Starting vm named: $params->{name} \n";
           
         vm start => $params->{name};
+    } else {
+    	#TODO: can't do this - without IPC, the initial task doesn't know about the die, so continues on
+    	#die "$params->{name} already exists - you can --force it if you need\n" unless ($params->{force});
+    	print "using exiting host: $params->{name}\n";
     }      
 
+
+	#TODO: and now test for name->ip->mac address..
+	my $ping = run "ping -c1 $params->{name}";
+	$ping =~ /\((.*?)\)/;
+	my $ping_ip = $1;
+	
     my $ips;
     my $count = 0;
     while (!defined($ips) || !defined($$ips[0])) {
@@ -143,11 +162,11 @@ task "create", group => "hoster", "name", sub {
 	    $count++;
     }
     
-    print "IP: --$$ips[0]--\n";
-    set $params->{name}, $$ips[0];
-    Rex::Config->set('ip', $$ips[0]);
     #TODO: terrible assumption - how to deal with more than one network interface per host?
-    #can't pass the ip back to eh calller :()
+    print "IP: --$$ips[0]--\n";
+    if ($$ips[0] eq $ping_ip) {
+    	print "hostname already mapped to IP, and mac - flying by the seat of our pants\n";
+    }
 
 	VMTASK: {
 		user($params->{vmuser});
@@ -161,18 +180,6 @@ task "create", group => "hoster", "name", sub {
 		#but, to run it, we need the vm's user details..
 		#OH. those are also vm details..
 		Rex::Task->run("Assembly:Remote:set_hostname", $$ips[0], $params);
-		  
-		#Rex::Task->run("Assembly:Remote:set_hostname", $$ips[0], $params);
-		#Rex::Task->run("_install", $$ips[0], {%$params, packages=>[qw/vim git subversion curl ssmtp/]});
-
-		#ssmtp setup
-		#Rex::Task->run("_run", $$ips[0], {%$params, run=>'rsync -avz sven@quad:/etc/ssmtp/* /etc/ssmtp/'});
-		
-		#TODO: extract to debian builder task
-		#Rex::Task->run("_install", $$ips[0], {%$params, packages=>[qw/reprepro make gcc fakeroot devscripts dpatch/]});
-		#Rex::Task->run("_checkout_code", $$ips[0], $params);
-		#Rex::Task->run("_build_pre", $$ips[0], $params);
-		#Rex::Task->run("_run_EPM", $$ips[0], $params);
 	}
 };
 
@@ -218,6 +225,22 @@ task "stop", group => "hoster", "name", sub {
 	print Dumper vm shutdown => $params->{name};
 };
 
+desc "status --name=";
+task "status", group => "hoster", sub {  
+    my ($params) = @_;  
+    #given that the list of params is built by rex, can it error out?
+    die 'need to define a --name= param' unless $params->{name};
+
+    my $list = vm list => "all";
+	#print Dumper @$list;
+    foreach my $host (@$list) {
+    	if ($host->{name} eq $params->{name}) {
+    		print Dumper $host;
+    		return $host;
+    	}
+    }
+    return;
+};
 
 desc "info --name=";
 task "info", group => "hoster", sub {  
@@ -274,12 +297,13 @@ task "ip", group => "hoster", "name", sub {
 
 sub __use_vnc {
     my $vmname = shift;
+
     
     my $server = Rex::get_current_connection()->{server};
     my $vncport = vm vncdisplay => $vmname;
     $vncport =~ s/.*:(.*)/$1/;
     $vncport = 5900+$1;
-    print "---- vnc to $server : $vncport\n";
+    print "---- vnc from $server to $vmname : $vncport\n";
    
     #TODO: use the vnc console to trigger traffic between the vmserver (where arp is running) and the vm
 	my $vnc = Net::VNC->new({hostname => $server, port=>$vncport});
@@ -292,7 +316,7 @@ sub __use_vnc {
     $vnc->send_key_event_string('rex');
     $vnc->send_key_event(0xff0d);
 	sleep(1);
-    $vnc->send_key_event_string('ping -c 10 big');
+    $vnc->send_key_event_string('ping -c 2 big');
     $vnc->send_key_event(0xff0d);
 	sleep(1);
 	#TODO: er, $vnc->close() ???
@@ -300,9 +324,13 @@ sub __use_vnc {
 }
 sub __vm_getip {
     my $vmname = shift;
+    
+    #use ping first - we might already the dns server knowing where we are..
+    run "ping -c2 $vmname";
+    
 #see http://rwmj.wordpress.com/2010/10/26/tip-find-the-ip-address-of-a-virtual-machine/
     my %addrs;
-    my @arp_lines = split /\n/, run 'arp -an';
+    my @arp_lines = split /\n/, run 'arp -a';
     foreach (@arp_lines) {
         if (/\((.*?)\) at (.*?) /) {
             $addrs{lc($2)} = $1;
