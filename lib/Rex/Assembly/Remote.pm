@@ -109,8 +109,6 @@ task "set_hostname", sub {
     run 'mkdir .ssh ; chmod 700 .ssh';
     upload $ENV{HOME}.'/.ssh/id_rsa', '.ssh';
 
-    #TODO: calling Task->run("run"... from here causes a crash
-
 };
 
 desc "run --name=";

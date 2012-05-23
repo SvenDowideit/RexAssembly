@@ -41,8 +41,12 @@ push(@ARGV, '--vm_auth=pass_auth');
 		password($params->{vmpassword});
 		pass_auth();
         
+        #delay loading the Rex::Assembly::Remote so that it uses the vm's user&pwd specified above.
+        eval 'use Rex::Assembly::Remote;';
+
+        
         #install a few things that I find useful
-        Rex::Task->modify_task("Assembly:Remote:install", "auth", {user=>$params->{vmuser}, password=>$params->{vmpassword}});
+        #Rex::Task->modify_task("Assembly:Remote:install", "auth", {user=>$params->{vmuser}, password=>$params->{vmpassword}});
         Rex::Task->run("Assembly:Remote:install", $params->{name}, {%$params, packages=>[qw/vim git subversion curl ssmtp/]});
 
         #force quad to be in ssh known_hosts so that rsync just works    
@@ -56,6 +60,12 @@ push(@ARGV, '--vm_auth=pass_auth');
         
         #do stuff to configure it
     }
+};
+
+after 'Assembly:create' => sub {
+    my ($server, $server_ref, $params) = @_;
+    
+    print "after Assembly:create\n";
 };
 
 around create => sub {

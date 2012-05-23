@@ -40,8 +40,6 @@ use Rex -base;
 unshift(@INC, '~/.rex');
 use RexConfig;
 
-
-
 use Data::Dumper;
 
 use Net::VNC;
@@ -81,6 +79,7 @@ desc "exists";
 task "exists", sub {
     my ($params) = @_;
     
+    #this shim allows us to put code around the create task - as need(exists) does not call the before/after/around wrappers (need to explain why)
     Rex::Task->run("Assembly:create", undef, $params);
     
 
@@ -155,7 +154,8 @@ task "create", group => "hoster", "name", sub {
 		password($params->{vmpassword});
 		pass_auth();
 		
-		Rex::Task->modify_task("Assembly:Remote:set_hostname", "auth", {user=>$params->{vmuser}, password=>$params->{vmpassword}});
+		#Rex::Task->modify_task("Assembly:Remote:set_hostname", "auth", {user=>$params->{vmuser}, password=>$params->{vmpassword}});
+		eval 'use Rex::Assembly::Remote;';
 		
 		#TODO: I wish this was not in the Rexfile, as imo its part of the VM only creation..
 		#but, to run it, we need the vm's user details..
@@ -323,8 +323,6 @@ sub __vm_getip {
 	return \@ips;
 };
 
-#TODO: put at the end to make the username and password scope for the remote vm not over-ride our hoster's auth'
-use Rex::Assembly::Remote;
 
 
 1;
