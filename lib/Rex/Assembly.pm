@@ -41,7 +41,6 @@ unshift(@INC, '~/.rex');
 use RexConfig;
 
 
-use Rex::Assembly::Remote;
 
 use Data::Dumper;
 
@@ -88,6 +87,12 @@ task "exists", sub {
 };
 
 
+before 'Assembly:exists' => sub {
+	print "### A:exists ###\n";
+};
+before 'exists' => sub {
+	print "### exists ###\n";
+};
 
 =pod
 
@@ -103,6 +108,7 @@ task "create", group => "hoster", "name", sub {
 
     #given that the list of params is built by rex, can it error out?
     die 'need to define a --name= param' unless $params->{name};
+print "two: $params->{sven}\n";
     
     #TODO: refuse to name a vm with chars you can't use in a hostname
     #refuse to create if the host already exists - test not only libvirsh, but dns etc too (add a --force..)
@@ -144,14 +150,14 @@ task "create", group => "hoster", "name", sub {
     Rex::Config->set('ip', $$ips[0]);
     #TODO: terrible assumption - how to deal with more than one network interface per host?
     #can't pass the ip back to eh calller :()
-    
-    #TODO: This is dependant on the template vm :/
-    user 'root';
-    password 'rex';
-    pass_auth;
 
-	Rex::Task->modify_task("Assembly:Remote:set_hostname", "user", 'root');
-	Rex::Task->modify_task("Assembly:Remote:set_hostname", "password", 'rex');
+	#set up the remote hostname task with the canned auth
+	if ($params->{vmauth} eq 'pass_auth') {
+		print "pass_auth\n";
+		pass_auth;
+	} else {
+	}
+	Rex::Task->modify_task("Assembly:Remote:set_hostname", "auth", {user=>$params->{vmuser}, password=>$params->{vmpassword}});
     
     #TODO: I wish this was not in the Rexfile, as imo its part of the VM only creation..
     #but, to run it, we need the vm's user details..
@@ -315,6 +321,9 @@ sub __vm_getip {
 	}
 	return \@ips;
 };
+
+#TODO: put at the end to make the username and password scope for the remote vm not over-ride our hoster's auth'
+use Rex::Assembly::Remote;
 
 
 1;

@@ -41,7 +41,7 @@ use Rex::Commands::Virtualization;
 
 use Rex -base;
 
-use Rex::Assembly::Remote;
+#use Rex::Assembly::Remote;
 
 use Data::Dumper;
 
@@ -94,6 +94,8 @@ desc "set_hostname --name=";
 task "set_hostname", sub {    
     my ($params) = @_;
 
+print "three: $params->{sven}\n";
+
     run "echo $params->{name} > /etc/hostname ; /etc/init.d/hostname.sh";
     #CAREFUL: don't call run sysctl '' - as sysctl already has a run in it.
     my $newhost = sysctl "kernel.hostname='$params->{name}'";
@@ -107,7 +109,7 @@ task "set_hostname", sub {
     run 'mkdir .ssh ; chmod 700 .ssh';
     upload $ENV{HOME}.'/.ssh/id_rsa', '.ssh';
     #force quad to be in ssh known_hosts so that rsync just works    
-    Rex::Task->run("_run", {%$params, run=>'ssh -o StrictHostKeyChecking=no quad'});
+    Rex::Task->run("_run", $params->{name}, {%$params, run=>'ssh -o StrictHostKeyChecking=no quad'});
 
 
 };

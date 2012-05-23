@@ -9,38 +9,39 @@ use Rex::Assembly;
 unshift(@INC, '~/.rex');
 use RexConfig;
 
+use Rex::Commands::SCM;
+
+set repository => "foswiki_trunk",
+      url => "http://svn.foswiki.org/trunk/",
+      type => "subversion";
+
 
 desc "create";
 task "create", sub {
     my ($params) = @_;
-
-    #TODO: need to (optionally) tell it what I want to create too
-    needs Rex::Assembly 'exists';
-
-    #given that the list of params is built by rex, can it error out?
     die 'need to define a --name= param' unless $params->{name};
+push(@ARGV, '--sven=dowideit');
+
+print "one: $params->{sven}\n";
+    #TODO: need to (optionally) tell it what I want to create too
+    #$params->{vmimgtemplate} = 'debianbox';  #ie, name of img file in box..
+    $params->{vmuser} = 'root';
+    $params->{vmpassword} = 'rex';
+    $params->{vmauth} = 'pass_auth';
+	Rex::Task->modify_task("Assembly:Remote:set_hostname", "auth", {user=>$params->{vmuser}, password=>$params->{vmpassword}});
+#the above $params settings and the modify_task dont' work, but this hack...
+push(@ARGV, '--vmuser=root');
+push(@ARGV, '--vmpassword=rex');
+push(@ARGV, '--vm_auth=pass_auth');
+
+    needs Rex::Assembly "exists";
     
-    my $ip = get $params->{name};
-    print "rexfile get ip = $ip\n";
-    $ip = Rex::Config->get('ip');
-    print "rexfile get ip = $ip\n";
-    $ip = Rex::Config->set('ip', $params->{name});
-    $ip = Rex::Config->get('ip');
-    print "rexfile get ip = $ip\n";
-    
-    
-    #TODO: This is dependant on the template vm :/
-    user 'root';
-    password 'rex';
-    pass_auth;
-    
-    #TODO: I wish this was not in the Rexfile, as imo its part of the VM only creation..
-    #but, to run it, we need the vm's user details..
-    #OH. those are also vm details..
-    Rex::Task->run("Assembly:Remote:set_hostname", $ip, $params);
+    ###########
+    # this is the actual bit - if i could use 'before' in a cross host IPC way, then this would be simpler to write
     
     #install a few things that I find useful
-    #Rex::Task->run("Assembly:Remote:install", $params->{ip}{$params->{name}}, {%$params, packages=>[qw/vim git subversion curl ssmtp/]});
+	Rex::Task->modify_task("Assembly:Remote:install", "auth", {user=>$params->{vmuser}, password=>$params->{vmpassword}});
+    Rex::Task->run("Assembly:Remote:install", $params->{name}, {%$params, packages=>[qw/vim git subversion curl ssmtp/]});
 
     #ssmtp setup
     #Rex::Task->run("Assembly:Remote:run", $params->{ip}{$params->{name}}, {%$params, run=>'rsync -avz sven@quad:/etc/ssmtp/* /etc/ssmtp/'});
@@ -50,58 +51,33 @@ task "create", sub {
     #Rex::Task->run("_checkout_code", $$ips[0], $params);
     #Rex::Task->run("_build_pre", $$ips[0], $params);
     #Rex::Task->run("_run_EPM", $$ips[0], $params);
-};
 
-########################################################
-## commands to manipulate the created vm
-
-use Rex::Commands::Sysctl;
-use Rex::Commands::Pkg;
-use Rex::Commands::SCM;
-use Rex::Commands::Rsync;
-use Rex::Commands::Upload;
-
-set repository => "foswiki_builder",
-      url => "http://fosiki.com/svn/projects/Perl/FoswikiInstaller/",
-      type => "subversion";
-
+    #checkout foswiki
+    #checkout 'foswiki_trunk', path=>'foswiki';
     
-desc "_checkout_code --name=";
-task "_checkout_code", sub {    
-    my ($params) = @_;
-
-    checkout 'foswiki_builder', path=>'foswiki';
+    #do stuff to configure it
 };
 
-desc "_build_pre --name=";
-task "_build_pre", sub {    
-    my ($params) = @_;
-
-    run 'cd foswiki/EPM/tools ; tar zxvf epm-4.2-source.tar.gz';
-    run 'cd foswiki/EPM/tools/epm-4.2 ; ./configure --disable-gui';
-    run 'cd foswiki/EPM/tools/epm-4.2 ; make';
-    run 'cd foswiki/EPM/tools/epm-4.2 ; make install';
-
-#TODO: need to get the gnupg key for signing the repo over
-    run 'rsync -avz sven@quad:/data/home/sven/.gnupg .';
-#TODO: set up svn credentials to svn up
-#TODO: add cronjob to runitall
-
-    #get packages..
-    #can't do this - as sync doesn't get 'run' from 'this server'
-    #sync 'sven@quad:/data/home/sven/src/distributedinformation/projects/Perl/FoswikiInstaller/Packages/*', 'foswiki/Packages/';
-    run 'rsync -avz sven@quad:/data/home/sven/src/distributedinformation/projects/Perl/FoswikiInstaller/Packages/* foswiki/Packages/';
-    run 'rsync -avz sven@quad:/data/home/sven/src/distributedinformation/projects/Perl/FoswikiInstaller/Packages/.git foswiki/Packages/';
-    run 'rsync -avz sven@quad:/data/home/sven/src/distributedinformation/projects/Perl/FoswikiInstaller/Foswiki_debian/* foswiki/Foswiki_debian/';
-
+around create => sub {
+	print "### test2 ###\n";
 };
 
-desc "_run EPM --name=";
-task "_run_EPM", sub {    
-    my ($params) = @_;
+before 'Ncreate' => sub {
+    my ($server, $server_ref, $params) = @_;
+
+    die 'need to define a --name= param' unless $params->{name};
+
+
+	print "### before ###\n";
     
-    run 'cd foswiki ; ./updateAndBuildPackages.sh > run.log 2>&1';
+    #I wanted to write do_task, but it does not have a $params hash.. so i'll use the Task->run
+    #do_task 'Assembly:exists';
+    Rex::Task->run("Assembly:exists", $server, $params);
+    
+    #we have a vm
+	$$server_ref = $params->{name};
 };
+
 
 1;
 __DATA__
