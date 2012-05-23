@@ -146,7 +146,7 @@ task "create", group => "hoster", "name", sub {
     	print "using exiting host: $params->{name}\n";
     }      
 
-
+	#I'd like to move this into an 'after Assembly:exists but something goes wrong.
 	#TODO: and now test for name->ip->mac address..
 	my $ping = run "ping -c1 $params->{name}";
 	$ping =~ /\((.*?)\)/;
@@ -184,9 +184,9 @@ task "create", group => "hoster", "name", sub {
 };
 
 around create => sub {
-	my $params = shift;
+    my ($server, $server_ref, $params) = @_;
 	##TODO: this bothers me, I think the commandline param should be available here too
-	print "### test $params->{name}###\n";
+	print "### test on $server $params->{name}###\n";
 };
 
 
