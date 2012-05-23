@@ -122,6 +122,7 @@ desc "install --name=";
 task "install", sub {    
     my ($params) = @_;
 
+    update_package_db;
     install package => $params->{packages};
 };
 
