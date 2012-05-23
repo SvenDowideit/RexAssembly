@@ -93,8 +93,8 @@ use Rex::Commands::Upload;
 desc "set_hostname --name=";
 task "set_hostname", sub {    
     my ($params) = @_;
-
-print "three: $params->{sven}\n";
+    #given that the list of params is built by rex, can it error out?
+    die 'need to define a --name= param' unless $params->{name};
 
     run "echo $params->{name} > /etc/hostname ; /etc/init.d/hostname.sh";
     #CAREFUL: don't call run sysctl '' - as sysctl already has a run in it.
@@ -108,9 +108,8 @@ print "three: $params->{sven}\n";
     #shame that upload doesn't do dir's
     run 'mkdir .ssh ; chmod 700 .ssh';
     upload $ENV{HOME}.'/.ssh/id_rsa', '.ssh';
-    #force quad to be in ssh known_hosts so that rsync just works    
-    Rex::Task->run("_run", $params->{name}, {%$params, run=>'ssh -o StrictHostKeyChecking=no quad'});
 
+    #TODO: calling Task->run("run"... from here causes a crash
 
 };
 

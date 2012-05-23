@@ -20,42 +20,42 @@ desc "create";
 task "create", sub {
     my ($params) = @_;
     die 'need to define a --name= param' unless $params->{name};
-push(@ARGV, '--sven=dowideit');
 
-print "one: $params->{sven}\n";
     #TODO: need to (optionally) tell it what I want to create too
     #$params->{vmimgtemplate} = 'debianbox';  #ie, name of img file in box..
     $params->{vmuser} = 'root';
     $params->{vmpassword} = 'rex';
     $params->{vmauth} = 'pass_auth';
-	Rex::Task->modify_task("Assembly:Remote:set_hostname", "auth", {user=>$params->{vmuser}, password=>$params->{vmpassword}});
-#the above $params settings and the modify_task dont' work, but this hack...
+	
+#the above $params settings, but this hack...
 push(@ARGV, '--vmuser=root');
 push(@ARGV, '--vmpassword=rex');
 push(@ARGV, '--vm_auth=pass_auth');
 
     needs Rex::Assembly "exists";
     
-    ###########
-    # this is the actual bit - if i could use 'before' in a cross host IPC way, then this would be simpler to write
-    
-    #install a few things that I find useful
-	Rex::Task->modify_task("Assembly:Remote:install", "auth", {user=>$params->{vmuser}, password=>$params->{vmpassword}});
-    Rex::Task->run("Assembly:Remote:install", $params->{name}, {%$params, packages=>[qw/vim git subversion curl ssmtp/]});
+    VMTASK: {
+        ###########
+        # this is the actual bit - if i could use 'before' in a cross host IPC way, then this would be simpler to write
+		user($params->{vmuser});
+		password($params->{vmpassword});
+		pass_auth();
+        
+        #install a few things that I find useful
+        Rex::Task->modify_task("Assembly:Remote:install", "auth", {user=>$params->{vmuser}, password=>$params->{vmpassword}});
+        Rex::Task->run("Assembly:Remote:install", $params->{name}, {%$params, packages=>[qw/vim git subversion curl ssmtp/]});
 
-    #ssmtp setup
-    #Rex::Task->run("Assembly:Remote:run", $params->{ip}{$params->{name}}, {%$params, run=>'rsync -avz sven@quad:/etc/ssmtp/* /etc/ssmtp/'});
-    
-    #TODO: extract to debian builder task
-    #Rex::Task->run("_install", $$ips[0], {%$params, packages=>[qw/reprepro make gcc fakeroot devscripts dpatch/]});
-    #Rex::Task->run("_checkout_code", $$ips[0], $params);
-    #Rex::Task->run("_build_pre", $$ips[0], $params);
-    #Rex::Task->run("_run_EPM", $$ips[0], $params);
+        #force quad to be in ssh known_hosts so that rsync just works    
+        #Rex::Task->run("run", $params->{name}, {%$params, run=>'ssh -o StrictHostKeyChecking=no quad'});
 
-    #checkout foswiki
-    #checkout 'foswiki_trunk', path=>'foswiki';
-    
-    #do stuff to configure it
+        #ssmtp setup
+        #Rex::Task->run("Assembly:Remote:run", $params->{ip}{$params->{name}}, {%$params, run=>'rsync -avz sven@quad:/etc/ssmtp/* /etc/ssmtp/'});
+
+        #checkout foswiki
+        #checkout 'foswiki_trunk', path=>'foswiki';
+        
+        #do stuff to configure it
+    }
 };
 
 around create => sub {

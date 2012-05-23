@@ -108,7 +108,6 @@ task "create", group => "hoster", "name", sub {
 
     #given that the list of params is built by rex, can it error out?
     die 'need to define a --name= param' unless $params->{name};
-print "two: $params->{sven}\n";
     
     #TODO: refuse to name a vm with chars you can't use in a hostname
     #refuse to create if the host already exists - test not only libvirsh, but dns etc too (add a --force..)
@@ -151,34 +150,36 @@ print "two: $params->{sven}\n";
     #TODO: terrible assumption - how to deal with more than one network interface per host?
     #can't pass the ip back to eh calller :()
 
-	#set up the remote hostname task with the canned auth
-	if ($params->{vmauth} eq 'pass_auth') {
-		print "pass_auth\n";
-		pass_auth;
-	} else {
-	}
-	Rex::Task->modify_task("Assembly:Remote:set_hostname", "auth", {user=>$params->{vmuser}, password=>$params->{vmpassword}});
-    
-    #TODO: I wish this was not in the Rexfile, as imo its part of the VM only creation..
-    #but, to run it, we need the vm's user details..
-    #OH. those are also vm details..
-    Rex::Task->run("Assembly:Remote:set_hostname", $$ips[0], $params);
-      
-    #Rex::Task->run("Assembly:Remote:set_hostname", $$ips[0], $params);
-    #Rex::Task->run("_install", $$ips[0], {%$params, packages=>[qw/vim git subversion curl ssmtp/]});
+	VMTASK: {
+		user($params->{vmuser});
+		password($params->{vmpassword});
+		pass_auth();
+		
+		Rex::Task->modify_task("Assembly:Remote:set_hostname", "auth", {user=>$params->{vmuser}, password=>$params->{vmpassword}});
+		
+		#TODO: I wish this was not in the Rexfile, as imo its part of the VM only creation..
+		#but, to run it, we need the vm's user details..
+		#OH. those are also vm details..
+		Rex::Task->run("Assembly:Remote:set_hostname", $$ips[0], $params);
+		  
+		#Rex::Task->run("Assembly:Remote:set_hostname", $$ips[0], $params);
+		#Rex::Task->run("_install", $$ips[0], {%$params, packages=>[qw/vim git subversion curl ssmtp/]});
 
-    #ssmtp setup
-    #Rex::Task->run("_run", $$ips[0], {%$params, run=>'rsync -avz sven@quad:/etc/ssmtp/* /etc/ssmtp/'});
-    
-    #TODO: extract to debian builder task
-    #Rex::Task->run("_install", $$ips[0], {%$params, packages=>[qw/reprepro make gcc fakeroot devscripts dpatch/]});
-    #Rex::Task->run("_checkout_code", $$ips[0], $params);
-    #Rex::Task->run("_build_pre", $$ips[0], $params);
-    #Rex::Task->run("_run_EPM", $$ips[0], $params);
+		#ssmtp setup
+		#Rex::Task->run("_run", $$ips[0], {%$params, run=>'rsync -avz sven@quad:/etc/ssmtp/* /etc/ssmtp/'});
+		
+		#TODO: extract to debian builder task
+		#Rex::Task->run("_install", $$ips[0], {%$params, packages=>[qw/reprepro make gcc fakeroot devscripts dpatch/]});
+		#Rex::Task->run("_checkout_code", $$ips[0], $params);
+		#Rex::Task->run("_build_pre", $$ips[0], $params);
+		#Rex::Task->run("_run_EPM", $$ips[0], $params);
+	}
 };
 
 around create => sub {
-	print "### test ###\n";
+	my $params = shift;
+	##TODO: this bothers me, I think the commandline param should be available here too
+	print "### test $params->{name}###\n";
 };
 
 
