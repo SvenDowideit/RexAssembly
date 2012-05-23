@@ -31,6 +31,9 @@ task "create", sub {
     #delay loading the Rex::Assembly::Remote so that it uses the vm's user&pwd specified above, and thus i don't need to modify_task.
     eval 'use Rex::Assembly::Remote;';
 
+    #sadly, this shows that the before task's change to $$server_ref didn't work, as this is a local task
+    #TODO: coaless the Rex::Task::run method - but write unit tests first?
+    print run 'uname -a';
     
     #install a few things that I find useful
     #Rex::Task->modify_task("Assembly:Remote:install", "auth", {user=>$params->{vmuser}, password=>$params->{vmpassword}});
@@ -71,7 +74,7 @@ before create => sub {
     #do_task 'Assembly:exists', $params;
     
     #we have a vm
-	#$$server_ref = $params->{name};
+	$$server_ref = $params->{name};
 };
 
 
