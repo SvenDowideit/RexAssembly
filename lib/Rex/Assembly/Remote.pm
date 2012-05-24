@@ -108,6 +108,7 @@ task "set_hostname", sub {
     #shame that upload doesn't do dir's
     run 'mkdir .ssh ; chmod 700 .ssh';
     upload $ENV{HOME}.'/.ssh/id_rsa', '.ssh';
+    upload $ENV{HOME}.'/.ssh/id_rsa.pub', '.ssh/authorized_keys';
 
 };
 
