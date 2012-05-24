@@ -103,11 +103,12 @@ lists the virtual machines in the RexConfig hoster group
 =cut
 
 desc "create";
-task "create", group => "hoster", "name", sub {
+task "create", group => "hoster", sub {
     my ($params) = @_;
 
     #given that the list of params is built by rex, can it error out?
     die 'need to define a --name= param' unless $params->{name};
+    die "--name=$params->{name} ambiguous, please use another name" if ($params->{name} == 1);
     
     #TODO: refuse to name a vm with chars you can't use in a hostname
     #refuse to create if the host already exists - test not only libvirsh, but dns etc too (add a --force..)

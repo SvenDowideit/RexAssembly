@@ -69,6 +69,7 @@ before create => sub {
 	print "### test2 - running on $server ($params->{name})###\n";
 	
     die 'need to define a --name= param' unless $params->{name};
+    die "--name=$params->{name} ambiguous, please use another name" if ($params->{name} == 1);
 
     Rex::Task->run("Assembly:exists", $server, $params);
     #do_task 'Assembly:exists', $params;
