@@ -91,8 +91,12 @@ use Rex::Commands::Rsync;
 use Rex::Commands::Upload;
 
 desc "set_hostname --name=";
-task "set_hostname", sub {    
+task "set_hostname", group => 'vm', sub {    
     my ($params) = @_;
+    
+    my $server = Rex::get_current_connection()->{server};
+    Rex::Logger::info("running set_hostname on $server, setting name to $params->{name}");
+    
     #given that the list of params is built by rex, can it error out?
     die 'need to define a --name= param' unless $params->{name};
 

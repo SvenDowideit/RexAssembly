@@ -37,13 +37,25 @@ use Rex::Commands::Virtualization;
 use Rex::Commands::Fs;
 
 use Rex -base;
-
-unshift(@INC, '~/.rex');
-use RexConfig;
-
 use Data::Dumper;
 
+#TODO: extract this so it only gets used if needed, and installed.
 use Net::VNC;
+
+#TODO: move the cfg code out into a 'task module cfg / persistence module'
+#tasks need to register what options they need so that we cna test and die before we start running them
+use YAML qw(LoadFile);
+my $cfg = YAML::LoadFile('/home/sven/.rex/config.yml');# if (-f '~/.rex/config.yml');
+
+#print "\n===========\n".Dumper(keys (%{$cfg->{groups}}))."\n===========\n";
+
+map {
+		#print STDERR $_;
+		group $_, $cfg->{groups}->{$_}->{hosts} 
+	} keys (%{$cfg->{groups}});
+
+set virtualization => $cfg->{virtualization};
+
 
 =pod
 
@@ -81,7 +93,8 @@ task "exists", sub {
     my ($params) = @_;
 
     #this shim allows us to put code around the create task - as need(exists) does not call the before/after/around wrappers (need to explain why)
-    Rex::Task->run("Assembly:create", undef, $params);
+    #Rex::Task->run("Assembly:create", undef, $params);
+    do_task 'Assembly:create';
     
 
 };
@@ -90,9 +103,9 @@ task "exists", sub {
 before 'Assembly:exists' => sub {
 	print "### A:exists ###\n";
 };
-before 'exists' => sub {
-	print "### exists ###\n";
-};
+#before 'exists' => sub {
+#	print "### exists ###\n";
+#};
 
 =pod
 
@@ -110,13 +123,17 @@ task "create", group => "hoster", sub {
     die 'need to define a --name= param' unless $params->{name};
     die "--name=$params->{name} ambiguous, please use another name" if ($params->{name} eq '1');
     
+    my $server = Rex::get_current_connection()->{server};
+    my $base_box = $cfg->{Base}->{TemplateImages}->{$cfg->{Base}->{DefaultBox}};
+    
+    
     #TODO: refuse to name a vm with chars you can't use in a hostname
     #refuse to create if the host already exists - test not only libvirsh, but dns etc too (add a --force..)
 #    my $host = do_task("Assembly:status");  #BUG? this do_task returns nothing :() - should work as we're on the same host, so could use the same forked process... else  IPC
     my $host = _status($params->{name});
     #print 'info'.Dumper $host;
     if (!defined($host)) {
-        print "Creating vm named: $params->{name} \n";
+        print "Creating vm named: $params->{name} on $server\n";
         vm create => $params->{name},
 		network => [
          {  type    => "bridge",
@@ -124,8 +141,8 @@ task "create", group => "hoster", sub {
          },],
          storage     => [
              {
-                file   => vm_imagesdir.$params->{name}.".img",
-                template   => vm_imagetemplatesdir.vm_templateimage,
+                file   => $cfg->{hosts}->{$server}->{ImageDir}.$params->{name}.".img",
+                template   => $cfg->{hosts}->{$server}->{TemplateImageDir}.$base_box->{ImageFile},
              },
           ],
           graphics => { type=>'vnc',
@@ -140,10 +157,12 @@ task "create", group => "hoster", sub {
     	#TODO: can't do this - without IPC, the initial task doesn't know about the die, so continues on
     	#die "$params->{name} already exists - you can --force it if you need\n" unless ($params->{force});
     	print "using exiting host: $params->{name}\n";
+    	vm start => $params->{name} unless ($host->{status} eq 'running');
     }      
 
 	#I'd like to move this into an 'after Assembly:exists but something goes wrong.
 	#TODO: and now test for name->ip->mac address..
+	#TODO: and test that the ping succeeds - it might need starting!
 	my $ping = run "ping -c1 $params->{name}";
 	$ping =~ /\((.*?)\)/;
 	my $ping_ip = $1;
@@ -151,7 +170,7 @@ task "create", group => "hoster", sub {
     my $ips;
     my $count = 0;
     while (!defined($ips) || !defined($$ips[0])) {
-		__use_vnc($params->{name}, vm_templateimage_user, vm_templateimage_password) if ($count > 0); #kick the server with vnc if we don't get instant success'
+		__use_vnc($params->{name}, $base_box->{user}, $base_box->{password}) if ($count > 0); #kick the server with vnc if we don't get instant success'
         print "   try\n";
         $ips = __vm_getip($params->{name});
         sleep(1);
@@ -165,17 +184,18 @@ task "create", group => "hoster", sub {
     }
 
 	VMTASK: {
-		user(vm_templateimage_user);
-		password(vm_templateimage_password);
-		pass_auth();
+		user($base_box->{user});
+		password($base_box->{password});
+		pass_auth();# if ($base_box->{auth} eq 'pass_auth');
 		
-		print "Setting user to ".vm_templateimage_user."\n";
+		print "Setting user to ".$base_box->{user}."\n";
 		eval 'use Rex::Assembly::Remote;';
 		
 		#TODO: I wish this was not in the Rexfile, as imo its part of the VM only creation..
 		#but, to run it, we need the vm's user details..
 		#OH. those are also vm details..
-		Rex::Task->run("Assembly:Remote:set_hostname", $$ips[0], $params);
+		#Rex::Task->run("Assembly:Remote:set_hostname", $$ips[0], $params);
+		Rex::TaskList->get_task("Assembly:Remote:set_hostname")->run($$ips[0], params => $params);
 	}
 };
 
@@ -281,10 +301,12 @@ task "delete", group => "hoster", "name", sub {
     	return -1;
     }
 
-    print "Deleting vm named: $params->{name} \n";
+    my $server = Rex::get_current_connection()->{server};
+    
+    print "Deleting vm named: $params->{name}from $server \n";
 	vm delete => $params->{name};
     print "Deleting image named: vm_imagesdir.$params->{name}.img \n";
-	rm vm_imagesdir.$params->{name}.".img";
+    rm $cfg->{hosts}->{$server}->{ImageDir}.$params->{name}.".img";
 	
 };
 
