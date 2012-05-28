@@ -5,7 +5,6 @@ use warnings;
 
 use Data::Dumper;
 
-use Rex::Args;
 use Rex::Commands::SCM;
 use Rex::Commands::Pkg;
 
@@ -22,17 +21,7 @@ map {
 	} keys (%{$cfg->{groups}});
 set virtualization => $cfg->{virtualization};
 
-
-use Rex::Assembly;
-
-
-my %args = Rex::Args->get();
-
-#opefully this too can move to somewhere general
-if (defined($args{name})) {
-	print "\n----".$args{name}."\n";
-	group 'vm', $args{name};
-}
+use Rex::Box;
 
 
 desc "create";
@@ -43,19 +32,19 @@ task "create", sub {
     die 'need to define a --name= param' unless $params->{name};
     die "--name=$params->{name} ambiguous, please use another name" if ($params->{name} eq '1');
     
-    #make sure the vm exists, or create it
-    Rex::TaskList->get_task("Assembly:exists")->run($cfg->{virtualization_host}, params => $params);
+    group 'vm', $params->{name};
     
+    #make sure the vm exists, or create it
+    Rex::TaskList->get_task("Box:exists")->run($cfg->{virtualization_host}, params => $params);
+    
+    my $vmtask = Rex::TaskList->get_task("vmcreate");
+    $vmtask->set_user('root');
+    $vmtask->set_password('rex');
 	pass_auth(); #TODO: it bothers me that pass_auth works different from user() and password()
-    #Rex::Task->run("vmcreate", $params->{name}, $params);
-    #do_task 'vmcreate';
-    Rex::TaskList->get_task("vmcreate")->run($params->{name}, params => $params);
+    $vmtask->run($params->{name}, params => $params);
     
 };
 
-user('root');
-password('rex');
-#pass_auth(); #darn, using this here breaks the ssh key based hoster access
 task "vmcreate", group=> 'vm', sub {
     my ($params) = @_;
     
@@ -66,12 +55,9 @@ task "vmcreate", group=> 'vm', sub {
     update_package_db;
     install package => [qw/vim git subversion curl ssmtp/];
 
-    #force quad to be in ssh known_hosts so that rsync just works    
-    run 'ssh -o StrictHostKeyChecking=no quad &';
-    sleep(1);
-
     #ssmtp setup
-    run 'rsync -avz sven@quad:/etc/ssmtp/* /etc/ssmtp/';
+    #force quad to be in ssh known_hosts so that rsync just works    
+    run 'rsync -avz -e "ssh -o StrictHostKeyChecking=no" sven@quad:/etc/ssmtp/* /etc/ssmtp/';
 
 	#this needs to run on the vm, not here..
     #checkout foswiki
