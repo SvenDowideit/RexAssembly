@@ -1,0 +1,36 @@
+#This file needs to be in ~/.rex/config.yml
+
+#TODO: libvirsh cna't cope with ~, nor can most of Rex
+#TODO: best thing to do is to convert ~ on loading
+groups:
+  hoster:
+    hosts: big
+hosts: 
+  big:
+    user: sven
+    ssh_key: /home/sven/.ssh/id_rsa.pub
+    ImageDir: /home/sven/virsh/
+    TemplateImageDir: /home/sven/virsh/templates/
+    
+virtualization_host: big
+virtualization: LibVirt
+    
+#these Base boxes need to be registered by a rex task, but for now, i'll hard code their locations
+#also, these locations depend on what machine and user they are on - unless I store it all locally and push when its needed..
+Base:
+  DefaultBox: debianbox
+  TemplateImages: 
+    debianbox:
+      ImageFile: debianbox.img
+      URL: http://localhost/somewhere/debianbox.img
+      user: root
+      password: rex
+      auth: pass_auth
+    
+#set repository => "foswiki_trunk",
+#      url => "http://svn.foswiki.org/trunk/",
+#      type => "subversion";
+repositorys: 
+  foswiki_trunk:
+    url: http://svn.foswiki.org/trunk/
+    type: subversion
